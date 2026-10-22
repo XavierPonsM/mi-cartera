@@ -2,6 +2,8 @@
 
 **Offline-first personal finance PWA** — budget allocation, expense tracking with bank-statement import and receipt OCR, net-worth dashboard and compound-interest simulator. Vanilla JavaScript, no build step, no backend, no tracking.
 
+**[▶ Live demo](https://xavierponsm.github.io/mi-cartera/)** — runs entirely in your browser; data stays on your device.
+
 ![Screenshots](docs/screenshots.png)
 <sub>Screenshots with demo data. The UI is in Spanish.</sub>
 
