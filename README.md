@@ -1,117 +1,90 @@
 # miCartera
 
-PWA de finanzas personales para móvil. Funciona sin conexión y se puede instalar en la pantalla de inicio.
+**Offline-first personal finance PWA** — budget allocation, expense tracking with bank-statement import and receipt OCR, net-worth dashboard and compound-interest simulator. Vanilla JavaScript, no build step, no backend, no tracking.
 
-## Características
+![Screenshots](docs/screenshots.png)
+<sub>Screenshots with demo data. The UI is in Spanish.</sub>
 
-- **Ingresos** — sueldo base, extras/bonus y otros ingresos variables
-- **Distribución mensual** — asigna cada euro a MSCI World, monetario, colchón o gastos. El dinero libre y la tasa de ahorro (en % y en €) se actualizan en tiempo real. Toca cualquier segmento de la barra para ver el desglose
-- **Gastos** — registro manual por categoría, edición inline tocando cualquier movimiento, navegación por meses
-- **Importación** — CSV, XLSX y PDF de cualquier banco. Las columnas se detectan automáticamente. Optimizado para el extracto XLSX de BBVA
-- **Escanear ticket** — foto del ticket desde la cámara, extrae importe, fecha y comercio con OCR (Tesseract.js)
-- **Exportar CSV** — descarga los gastos del mes seleccionado
-- **Activos dinámicos** — añade, edita y elimina activos con nombre, tipo (Liquidez / Inversión LP / Alternativo) y rentabilidad personalizada. Sincronización en tiempo real con el dashboard
-- **Patrimonio** — gráfico donut y métricas por tipo de activo
-- **Objetivos** — metas de ahorro con barra de progreso y tiempo estimado
-- **Simulador** — interés compuesto con gráfico: capital inicial, aportación mensual, TAE y horizonte temporal
-- **Backup** — exportar e importar todos los datos en JSON desde el menú lateral (☰)
+## Features
 
-## Estructura del proyecto
+- **Monthly allocation** — split income across index fund, money market, emergency fund and spending; free cash and savings rate update live from real expenses
+- **Expense tracking** — categories, inline editing, month navigation, CSV export
+- **Statement import** — XLSX, CSV and PDF from any bank, with automatic column detection (Spanish/English headers) and duplicate detection by description + amount + date
+- **Receipt scanning** — camera capture + OCR (Tesseract.js) extracts amount, date and merchant
+- **Net worth** — custom assets by type (cash / long-term investment / alternative) with donut chart
+- **Savings goals** — progress and estimated time to completion
+- **Compound-interest simulator** — initial capital, monthly contribution, annual return and horizon, with chart
+- **Installable & offline** — Service Worker cache and Web App Manifest (iOS/Android)
+- **Private by design** — all data stays in `localStorage`; JSON backup/restore from the side menu
+
+## Tech
+
+| Area | Choice |
+|---|---|
+| UI | HTML5, CSS3, vanilla JS — no framework, no bundler |
+| Charts | Canvas API (hand-drawn donut and line chart) |
+| Offline | Service Worker + Web App Manifest |
+| Parsing | [SheetJS](https://sheetjs.com/) (XLSX), [PDF.js](https://mozilla.github.io/pdf.js/) (PDF) — lazy-loaded from CDN |
+| OCR | [Tesseract.js](https://tesseract.projectnaptha.com/) — lazy-loaded on first scan |
+| Storage | `localStorage` (key `micartera_v2`) |
+
+## Project structure
 
 ```
-files/
-├── index.html          # HTML limpio, sin estilos ni scripts inline
-├── manifest.json       # Configuración PWA
-├── sw.js               # Service Worker (caché offline)
-├── icon.png            # Icono de la app
-├── css/
-│   └── app.css         # Todos los estilos
+├── index.html          # Markup only — no inline styles or scripts
+├── manifest.json       # PWA manifest
+├── sw.js               # Service Worker (offline cache)
+├── css/app.css
 └── js/
-    ├── constants.js    # Helpers de formato, CATS, colores, estado global (gastos, objetivos, assets)
-    ├── store.js        # Persistencia con localStorage + exportar/importar backup JSON
-    ├── gastos.js       # Registro, edición y renderizado de gastos; navegación por meses
-    ├── activos.js      # Gestión dinámica de activos (CRUD)
-    ├── objetivos.js    # Gestión de objetivos de ahorro
-    ├── simulador.js    # Calculadora de interés compuesto + gráfico
-    ├── csv.js          # Importación CSV / XLSX / PDF + OCR de tickets
-    └── app.js          # Navegación, distribución mensual, donut, inicialización
+    ├── constants.js    # Formatting helpers, categories, global state
+    ├── store.js        # localStorage persistence + JSON backup/restore
+    ├── gastos.js       # Expenses: CRUD, rendering, month navigation
+    ├── activos.js      # Assets: CRUD
+    ├── objetivos.js    # Savings goals
+    ├── simulador.js    # Compound-interest calculator + chart
+    ├── csv.js          # CSV / XLSX / PDF import + receipt OCR
+    └── app.js          # Navigation, allocation bar, donut, bootstrapping
 ```
 
-## Cómo funciona la tasa de ahorro y el dinero disponible
-
-Ambas métricas usan los **gastos reales registrados** en el mes actual:
-
-- **Dinero libre** = ingresos − (MSCI + monetario + colchón) − gastos reales del mes
-- **Tasa de ahorro** = (ingresos − gastos reales) / ingresos × 100
-- **Euros ahorrados** = ingresos − gastos reales
-
-El campo "Gastos reales" en la distribución mensual se actualiza automáticamente cada vez que añades, editas o eliminas un gasto.
-
-## Uso en local
+## Run locally
 
 ```bash
-# Python
-python3 -m http.server 8080
-
-# Node
-npx serve .
+python3 -m http.server 8080   # or: npx serve .
 ```
 
-La app se registra como PWA al acceder desde HTTPS o localhost. En Safari (iOS) usa "Añadir a pantalla de inicio" para instalarla.
+Open `http://localhost:8080`. The Service Worker registers on HTTPS or localhost; on iOS use *Share → Add to Home Screen* to install.
 
-## Importación de extractos
+## How the metrics are computed
 
-| Formato | Compatibilidad |
-|---------|---------------|
-| XLSX    | BBVA (optimizado), cualquier banco con columnas estándar |
-| CSV     | Revolut, ING, N26, cualquier banco con separador `;` `,` o `TAB` |
-| PDF     | Extractos digitales con texto real (no escaneados) |
+- **Free cash** = income − (index fund + money market + emergency fund) − actual expenses this month
+- **Savings rate** = (income − actual expenses) / income × 100
 
-La detección de columnas es automática: busca encabezados en español e inglés (`fecha`, `date`, `concepto`, `description`, `importe`, `amount`, `cargo`…) y salta filas de metadatos. Solo se importan los cargos negativos. Los duplicados se detectan por descripción + importe + fecha.
+## Statement import
 
-## Escanear ticket con la cámara
+| Format | Tested with |
+|---|---|
+| XLSX | BBVA (optimized), any bank with standard columns |
+| CSV | Revolut, ING, N26 — `;`, `,` or TAB separators |
+| PDF | Digital statements with real text (not scans) |
 
-El botón "Escanear ticket" en el modal de nuevo gasto abre la cámara trasera del móvil. El OCR (Tesseract.js, cargado desde CDN la primera vez) extrae importe, fecha y nombre del comercio. El usuario puede corregir los campos antes de guardar.
+Only debits are imported; metadata rows are skipped automatically.
 
-Funciona bien con tickets impresos en buena luz. Para tickets muy deteriorados o con letra pequeña los resultados pueden ser imprecisos.
+## Open Banking (PSD2) — prepared, disabled
 
-## Activos dinámicos
+Bank sync via Open Banking is scaffolded in the code but hidden in the UI. To enable it:
 
-Los activos son completamente personalizables desde la pestaña Activos:
+1. Uncomment the `<!-- OPEN BANKING: descomentar... -->` block in `index.html` (Expenses section)
+2. Change `display:none!important` to `display:flex` on the `bankModalBg` modal
 
-- **Añadir** — nombre, tipo (Liquidez / Inversión LP / Alternativo) y rentabilidad anual
-- **Editar** — nombre y rentabilidad inline, valor en el campo de la derecha
-- **Eliminar** — botón ✕ en cada fila
+The intended provider is **GoCardless Bank Account Data (Nordigen)**, free for personal use with 2,400+ European banks. It needs a small backend to hold the OAuth secrets — the browser never sees them.
 
-Todos los cambios se reflejan inmediatamente en el donut, las métricas del dashboard y la tarjeta de patrimonio.
-
-## Backup de datos
-
-Desde el menú lateral (☰ arriba a la derecha):
-
-- **Exportar backup** — descarga un JSON con todos los datos (gastos, activos, objetivos, configuración)
-- **Importar backup** — restaura el estado completo desde un JSON exportado previamente
-
-## Persistencia
-
-Todos los datos se guardan en `localStorage` bajo la clave `micartera_v2`. No se envía nada a ningún servidor. El backup JSON es la forma recomendada de hacer copias de seguridad, especialmente antes de limpiar datos del navegador.
-
-## Open Banking (PSD2)
-
-La integración con banco vía Open Banking está preparada en el código pero desactivada en la UI. Para activarla:
-
-1. Descomentar el bloque `<!-- OPEN BANKING: descomentar... -->` en `index.html` (sección Gastos)
-2. Cambiar `display:none!important` a `display:flex` en el modal `bankModalBg`
-
-El servicio recomendado es **GoCardless Nordigen** (gratuito para uso personal, +2.400 bancos en Europa). Requiere un backend propio que gestione los tokens OAuth — ver el ejemplo en la sección siguiente.
-
-### Arquitectura necesaria
+### Architecture
 
 ```
-[Tu banco] ← OAuth PSD2 → [Backend Node/Python] ← HTTPS → [miCartera PWA]
+[Bank] ← OAuth PSD2 → [Backend Node/Python] ← HTTPS → [miCartera PWA]
 ```
 
-### Setup básico del backend (Node.js)
+### Minimal backend (Node.js)
 
 ```bash
 npm install node-fetch express
@@ -146,12 +119,6 @@ app.get('/transactions/:accountId', async (req, res) => {
 app.listen(3000);
 ```
 
-## Tecnologías
+## License
 
-- HTML5 / CSS3 / JavaScript vanilla (sin dependencias en tiempo de ejecución)
-- Canvas API para gráficos (donut, simulador)
-- Service Worker para uso offline
-- Web App Manifest para instalación en iOS/Android
-- [SheetJS](https://sheetjs.com/) — lectura de XLSX (lazy load desde CDN)
-- [PDF.js](https://mozilla.github.io/pdf.js/) — extracción de texto de PDFs (lazy load desde CDN)
-- [Tesseract.js](https://tesseract.projectnaptha.com/) — OCR para tickets (lazy load desde CDN)
+MIT
